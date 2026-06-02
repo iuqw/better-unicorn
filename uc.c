@@ -1286,6 +1286,18 @@ uc_err uc_emu_stop(uc_engine *uc)
     return err;
 }
 
+UNICORN_EXPORT
+uc_err uc_trigger_safe_hook(uc_engine *uc)
+{
+    UC_INIT(uc);
+
+    uc->safe_hook_pending = true;
+    uc_err err = break_translation_loop(uc);
+
+    restore_jit_state(uc);
+    return err;
+}
+
 // return target index where a memory region at the address exists, or could be
 // inserted
 //

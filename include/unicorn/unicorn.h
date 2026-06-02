@@ -335,6 +335,13 @@ typedef void (*uc_cb_arm_mask_change_t)(uc_engine *uc, uint32_t regid,
                                         uint32_t new_value, void *user_data);
 
 /*
+  Callback function for explicitly triggered safe hooks.
+
+  @user_data: user data passed to tracing APIs.
+*/
+typedef void (*uc_cb_safe_hook_t)(uc_engine *uc, void *user_data);
+
+/*
   Callback function for MMIO read
 
   @offset: offset to the base address of the IO memory.
@@ -427,6 +434,8 @@ typedef enum uc_hook_type {
     UC_HOOK_ARM_PRIMASK = 1 << 19,
     // Hook on ARM M-profile FAULTMASK changes.
     UC_HOOK_ARM_FAULTMASK = 1 << 20,
+    // Hook explicitly triggered by uc_trigger_safe_hook().
+    UC_HOOK_SAFE = 1 << 21,
 } uc_hook_type;
 
 // Hook type for all events of unmapped memory access
@@ -1142,6 +1151,20 @@ uc_err uc_emu_start(uc_engine *uc, uint64_t begin, uint64_t until,
 */
 UNICORN_EXPORT
 uc_err uc_emu_stop(uc_engine *uc);
+
+/*
+ Request callbacks registered with UC_HOOK_SAFE.
+ This can be called from normal code or from existing callbacks. If emulation is
+ running, the current TB is interrupted and safe hook callbacks are dispatched
+ from the emulation thread after CPU state has been synchronized.
+
+ @uc: handle returned by uc_open()
+
+ @return UC_ERR_OK on success, or other value on failure (refer to uc_err enum
+   for detailed error).
+*/
+UNICORN_EXPORT
+uc_err uc_trigger_safe_hook(uc_engine *uc);
 
 /*
  Register callback for a hook event.

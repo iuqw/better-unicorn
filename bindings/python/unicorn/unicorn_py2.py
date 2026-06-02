@@ -153,6 +153,7 @@ _setup_prototype(_uc, "uc_mem_write", ucerr, uc_engine, ctypes.c_uint64, ctypes.
 _setup_prototype(_uc, "uc_emu_start", ucerr, uc_engine, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64,
                  ctypes.c_size_t)
 _setup_prototype(_uc, "uc_emu_stop", ucerr, uc_engine)
+_setup_prototype(_uc, "uc_trigger_safe_hook", ucerr, uc_engine)
 _setup_prototype(_uc, "uc_hook_del", ucerr, uc_engine, uc_hook_h)
 _setup_prototype(_uc, "uc_mmio_map", ucerr, uc_engine, ctypes.c_uint64, ctypes.c_size_t, ctypes.c_void_p,
                  ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
@@ -214,6 +215,7 @@ UC_HOOK_TCG_OPCODE_CB = ctypes.CFUNCTYPE(
 UC_HOOK_ARM_MASK_CHANGE_CB = ctypes.CFUNCTYPE(
     None, uc_engine, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p
 )
+UC_HOOK_SAFE_CB = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_void_p)
 
 
 # access to error code via @errno of UcError
@@ -567,6 +569,11 @@ class Uc(object):
         if status != uc.UC_ERR_OK:
             raise UcError(status)
 
+    def trigger_safe_hook(self):
+        status = _uc.uc_trigger_safe_hook(self._uch)
+        if status != uc.UC_ERR_OK:
+            raise UcError(status)
+
     # return the value of a register
     def reg_read(self, reg_id, opt=None):
         return reg_read(partial(_uc.uc_reg_read, self._uch), self._arch, reg_id, opt)
@@ -717,6 +724,11 @@ class Uc(object):
     def _hook_arm_mask_change_cb(self, handle, regid, old_value, new_value, user_data):
         (cb, data) = self._callbacks[user_data]
         cb(self, regid, old_value, new_value, data)
+
+    @_catch_hook_exception
+    def _hook_safe_cb(self, handle, user_data):
+        (cb, data) = self._callbacks[user_data]
+        cb(self, data)
 
     @_catch_hook_exception
     def _hook_insn_out_cb(self, handle, port, size, value, user_data):
@@ -872,6 +884,13 @@ class Uc(object):
         elif htype & (uc.UC_HOOK_ARM_PRIMASK | uc.UC_HOOK_ARM_FAULTMASK) and \
                 htype & ~(uc.UC_HOOK_ARM_PRIMASK | uc.UC_HOOK_ARM_FAULTMASK) == 0:
             cb = ctypes.cast(UC_HOOK_ARM_MASK_CHANGE_CB(self._hook_arm_mask_change_cb), UC_HOOK_ARM_MASK_CHANGE_CB)
+            status = _uc.uc_hook_add(
+                self._uch, ctypes.byref(_h2), htype, cb,
+                ctypes.cast(self._callback_count, ctypes.c_void_p),
+                ctypes.c_uint64(begin), ctypes.c_uint64(end)
+            )
+        elif htype == uc.UC_HOOK_SAFE:
+            cb = ctypes.cast(UC_HOOK_SAFE_CB(self._hook_safe_cb), UC_HOOK_SAFE_CB)
             status = _uc.uc_hook_add(
                 self._uch, ctypes.byref(_h2), htype, cb,
                 ctypes.cast(self._callback_count, ctypes.c_void_p),

@@ -228,6 +228,7 @@ typedef enum uc_hook_idx {
     UC_HOOK_BLOCK_ICOUNT_IDX,
     UC_HOOK_ARM_PRIMASK_IDX,
     UC_HOOK_ARM_FAULTMASK_IDX,
+    UC_HOOK_SAFE_IDX,
 
     UC_HOOK_MAX,
 } uc_hook_idx;
@@ -394,6 +395,7 @@ struct uc_struct {
                          // uc_emu_stop()
     bool quit_request;   // request to quit the current TB, but continue to
                          // emulate - for uc_mem_protect()
+    bool safe_hook_pending; // request to dispatch UC_HOOK_SAFE in cpu_exec()
     bool emulation_done; // emulation is done by uc_emu_start()
     bool timed_out;      // emulation timed out, that can retrieve via
                          // uc_query(UC_QUERY_TIMEOUT)

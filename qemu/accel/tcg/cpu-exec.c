@@ -549,6 +549,43 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     }
 }
 
+static inline bool cpu_handle_safe_hook(CPUState *cpu, int *ret)
+{
+    struct uc_struct *uc = cpu->uc;
+    struct hook *hook;
+    HOOK_FOREACH_VAR_DECLARE;
+
+    if (!uc->safe_hook_pending) {
+        return false;
+    }
+
+    uc->safe_hook_pending = false;
+
+    HOOK_FOREACH(uc, hook, UC_HOOK_SAFE) {
+        if (hook->to_delete) {
+            continue;
+        }
+
+        JIT_CALLBACK_GUARD(((uc_cb_safe_hook_t)hook->callback)(
+            uc, hook->user_data));
+
+        if (uc->stop_request) {
+            break;
+        }
+    }
+
+    if (uc->stop_request) {
+        *ret = EXCP_HLT;
+        return true;
+    }
+
+    if (cpu->exception_index == EXCP_INTERRUPT) {
+        cpu->exception_index = -1;
+    }
+
+    return false;
+}
+
 /* main execution loop */
 int cpu_exec(struct uc_struct *uc, CPUState *cpu)
 {
@@ -595,6 +632,10 @@ int cpu_exec(struct uc_struct *uc, CPUState *cpu)
         TranslationBlock *last_tb = NULL;
         int tb_exit = 0;
 
+        if (cpu_handle_safe_hook(cpu, &ret)) {
+            break;
+        }
+
         while (!cpu_handle_interrupt(cpu, &last_tb)) {
             uint32_t cflags = cpu->cflags_next_tb;
             TranslationBlock *tb;
@@ -615,12 +656,20 @@ int cpu_exec(struct uc_struct *uc, CPUState *cpu)
                 continue;
             }
             cpu_loop_exec_tb(cpu, tb, &last_tb, &tb_exit);
+            if (cpu_handle_safe_hook(cpu, &ret)) {
+                goto done;
+            }
             /* Try to align the host and virtual clocks
                if the guest is in advance */
             // align_clocks(&sc, cpu);
         }
+
+        if (cpu_handle_safe_hook(cpu, &ret)) {
+            break;
+        }
     }
 
+done:
     // Unicorn: Clear any TCG exit flag that might have been left set by exit requests
     uc->cpu->tcg_exit_req = 0;
 

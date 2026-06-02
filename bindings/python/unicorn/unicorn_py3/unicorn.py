@@ -198,6 +198,7 @@ def __set_lib_prototypes(lib: ctypes.CDLL) -> None:
     __set_prototype('uc_ctl', uc_err, uc_engine, s32)
     __set_prototype('uc_emu_start', uc_err, uc_engine, u64, u64, u64, size_t)
     __set_prototype('uc_emu_stop', uc_err, uc_engine)
+    __set_prototype('uc_trigger_safe_hook', uc_err, uc_engine)
     __set_prototype('uc_errno', uc_err, uc_engine)
     __set_prototype('uc_free', uc_err, void_p)
     __set_prototype('uc_hook_add', uc_err, uc_engine, PTR(uc_hook_h), s32, void_p, void_p, u64, u64)
@@ -244,6 +245,7 @@ HOOK_EDGE_GEN_CFUNC     = ctypes.CFUNCTYPE(None, uc_engine, ctypes.POINTER(uc_tb
 HOOK_TCG_OPCODE_CFUNC   = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint32, ctypes.c_void_p)
 HOOK_TLB_FILL_CFUNC     = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ctypes.c_uint64, ctypes.c_int, ctypes.POINTER(uc_tlb_entry), ctypes.c_void_p)
 HOOK_ARM_MASK_CHANGE_CFUNC = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p)
+HOOK_SAFE_CFUNC         = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_void_p)
 
 # mmio callback signatures
 MMIO_READ_CFUNC  = ctypes.CFUNCTYPE(ctypes.c_uint64, uc_engine, ctypes.c_uint64, ctypes.c_uint, ctypes.c_void_p)
@@ -780,6 +782,17 @@ class Uc(RegStateManager):
         if status != uc.UC_ERR_OK:
             raise UcError(status)
 
+    def trigger_safe_hook(self) -> None:
+        """Trigger callbacks registered with UC_HOOK_SAFE.
+
+        Raises: `UcError` in case safe hook dispatch fails
+        """
+
+        status = uclib.uc_trigger_safe_hook(self._uch)
+
+        if status != uc.UC_ERR_OK:
+            raise UcError(status)
+
     ###########################
     #  CPU state accessors    #
     ###########################
@@ -1117,6 +1130,13 @@ class Uc(RegStateManager):
 
             return (__hook_arm_mask_change_cb,)
 
+        def __hook_safe():
+            @uccallback(self, HOOK_SAFE_CFUNC)
+            def __hook_safe_cb(uc: Uc, key: int) -> None:
+                callback(uc, user_data)
+
+            return (__hook_safe_cb,)
+
         handlers: Dict[int, Callable[[], Tuple]] = {
             uc.UC_HOOK_INTR               : __hook_intr,
             uc.UC_HOOK_INSN               : __hook_insn,
@@ -1137,7 +1157,8 @@ class Uc(RegStateManager):
             uc.UC_HOOK_TCG_OPCODE         : __hook_tcg_opcode,
             uc.UC_HOOK_TLB_FILL           : __hook_tlb_fill,
             uc.UC_HOOK_ARM_PRIMASK        : __hook_arm_mask_change,
-            uc.UC_HOOK_ARM_FAULTMASK      : __hook_arm_mask_change
+            uc.UC_HOOK_ARM_FAULTMASK      : __hook_arm_mask_change,
+            uc.UC_HOOK_SAFE               : __hook_safe
         }
 
         # the same callback may be registered for multiple hook types if they
