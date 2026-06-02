@@ -211,6 +211,9 @@ UC_HOOK_EDGE_GEN_CB = ctypes.CFUNCTYPE(
 UC_HOOK_TCG_OPCODE_CB = ctypes.CFUNCTYPE(
     None, uc_engine, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_void_p
 )
+UC_HOOK_ARM_MASK_CHANGE_CB = ctypes.CFUNCTYPE(
+    None, uc_engine, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p
+)
 
 
 # access to error code via @errno of UcError
@@ -711,6 +714,11 @@ class Uc(object):
                   uc_arm64_cp_reg_tuple(cp_reg.crn, cp_reg.crm, cp_reg.op0, cp_reg.op1, cp_reg.op2, cp_reg.val), data)
 
     @_catch_hook_exception
+    def _hook_arm_mask_change_cb(self, handle, regid, old_value, new_value, user_data):
+        (cb, data) = self._callbacks[user_data]
+        cb(self, regid, old_value, new_value, data)
+
+    @_catch_hook_exception
     def _hook_insn_out_cb(self, handle, port, size, value, user_data):
         # call user's callback with self object
         (cb, data) = self._callbacks[user_data]
@@ -856,6 +864,14 @@ class Uc(object):
             )
         elif htype == uc.UC_HOOK_EDGE_GENERATED:
             cb = ctypes.cast(UC_HOOK_EDGE_GEN_CB(self._hook_edge_gen_cb), UC_HOOK_EDGE_GEN_CB)
+            status = _uc.uc_hook_add(
+                self._uch, ctypes.byref(_h2), htype, cb,
+                ctypes.cast(self._callback_count, ctypes.c_void_p),
+                ctypes.c_uint64(begin), ctypes.c_uint64(end)
+            )
+        elif htype & (uc.UC_HOOK_ARM_PRIMASK | uc.UC_HOOK_ARM_FAULTMASK) and \
+                htype & ~(uc.UC_HOOK_ARM_PRIMASK | uc.UC_HOOK_ARM_FAULTMASK) == 0:
+            cb = ctypes.cast(UC_HOOK_ARM_MASK_CHANGE_CB(self._hook_arm_mask_change_cb), UC_HOOK_ARM_MASK_CHANGE_CB)
             status = _uc.uc_hook_add(
                 self._uch, ctypes.byref(_h2), htype, cb,
                 ctypes.cast(self._callback_count, ctypes.c_void_p),

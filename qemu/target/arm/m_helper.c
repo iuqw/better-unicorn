@@ -7,6 +7,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "unicorn/arm.h"
 #include "qemu/units.h"
 #include "cpu.h"
 #include "internals.h"
@@ -64,6 +65,55 @@ static uint32_t v7m_mrs_control(CPUARMState *env, uint32_t secure)
         value |= env->v7m.control[M_REG_S] & R_V7M_CONTROL_FPCA_MASK;
     }
     return value;
+}
+
+static void uc_arm_mask_changed(CPUARMState *env, uc_hook_idx hook_idx,
+                                uint32_t regid, uint32_t old_value,
+                                uint32_t new_value)
+{
+    struct uc_struct *uc = env->uc;
+    struct hook *hook;
+    HOOK_FOREACH_VAR_DECLARE;
+
+    if (!uc || old_value == new_value) {
+        return;
+    }
+
+    for (cur = uc->hook[hook_idx].head;
+         cur != NULL && (hook = (struct hook *)cur->data); cur = cur->next) {
+        if (hook->to_delete) {
+            continue;
+        }
+
+        JIT_CALLBACK_GUARD(((uc_cb_arm_mask_change_t)hook->callback)(
+            uc, regid, old_value, new_value, hook->user_data));
+
+        if (uc->stop_request) {
+            break;
+        }
+    }
+}
+
+static void v7m_write_primask(CPUARMState *env, uint32_t bank,
+                              uint32_t value)
+{
+    uint32_t old_value = env->v7m.primask[bank];
+    uint32_t new_value = value & 1;
+
+    env->v7m.primask[bank] = new_value;
+    uc_arm_mask_changed(env, UC_HOOK_ARM_PRIMASK_IDX, UC_ARM_REG_PRIMASK,
+                        old_value, new_value);
+}
+
+static void v7m_write_faultmask(CPUARMState *env, uint32_t bank,
+                                uint32_t value)
+{
+    uint32_t old_value = env->v7m.faultmask[bank];
+    uint32_t new_value = value & 1;
+
+    env->v7m.faultmask[bank] = new_value;
+    uc_arm_mask_changed(env, UC_HOOK_ARM_FAULTMASK_IDX, UC_ARM_REG_FAULTMASK,
+                        old_value, new_value);
 }
 
 /*
@@ -2359,7 +2409,7 @@ void HELPER(v7m_msr)(CPUARMState *env, uint32_t maskreg, uint32_t val)
             if (!env->v7m.secure) {
                 return;
             }
-            env->v7m.primask[M_REG_NS] = val & 1;
+            v7m_write_primask(env, M_REG_NS, val);
             return;
         case 0x91: /* BASEPRI_NS */
             if (!env->v7m.secure || !arm_feature(env, ARM_FEATURE_M_MAIN)) {
@@ -2371,7 +2421,7 @@ void HELPER(v7m_msr)(CPUARMState *env, uint32_t maskreg, uint32_t val)
             if (!env->v7m.secure || !arm_feature(env, ARM_FEATURE_M_MAIN)) {
                 return;
             }
-            env->v7m.faultmask[M_REG_NS] = val & 1;
+            v7m_write_faultmask(env, M_REG_NS, val);
             return;
         case 0x94: /* CONTROL_NS */
             if (!env->v7m.secure) {
@@ -2460,7 +2510,7 @@ void HELPER(v7m_msr)(CPUARMState *env, uint32_t maskreg, uint32_t val)
                 env->v7m.psplim[env->v7m.secure] = val & ~7;
                 break;
             case 16: /* PRIMASK */
-                env->v7m.primask[env->v7m.secure] = val & 1;
+                v7m_write_primask(env, env->v7m.secure, val);
                 break;
             case 17: /* BASEPRI */
                 if (!arm_feature(env, ARM_FEATURE_M_MAIN)) {
@@ -2482,7 +2532,7 @@ void HELPER(v7m_msr)(CPUARMState *env, uint32_t maskreg, uint32_t val)
                 if (!arm_feature(env, ARM_FEATURE_M_MAIN)) {
                     goto bad_reg;
                 }
-                env->v7m.faultmask[env->v7m.secure] = val & 1;
+                v7m_write_faultmask(env, env->v7m.secure, val);
                 break;
             case 20: /* CONTROL */
                 /*

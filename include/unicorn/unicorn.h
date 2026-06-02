@@ -322,6 +322,19 @@ typedef void (*uc_hook_tcg_op_2)(uc_engine *uc, uint64_t address, uint64_t arg1,
 typedef uc_hook_tcg_op_2 uc_hook_tcg_sub_t;
 
 /*
+  Callback function for ARM special mask register changes.
+
+  @regid: changed register ID, one of UC_ARM_REG_PRIMASK or
+  UC_ARM_REG_FAULTMASK
+  @old_value: register value before the write
+  @new_value: register value after the write
+  @user_data: user data passed to tracing APIs.
+*/
+typedef void (*uc_cb_arm_mask_change_t)(uc_engine *uc, uint32_t regid,
+                                        uint32_t old_value,
+                                        uint32_t new_value, void *user_data);
+
+/*
   Callback function for MMIO read
 
   @offset: offset to the base address of the IO memory.
@@ -410,6 +423,10 @@ typedef enum uc_hook_type {
     UC_HOOK_TLB_FILL = 1 << 17,
     // Hook basic blocks but get the number of instructions as size
     UC_HOOK_BLOCK_ICOUNT = 1 << 18,
+    // Hook on ARM M-profile PRIMASK changes.
+    UC_HOOK_ARM_PRIMASK = 1 << 19,
+    // Hook on ARM M-profile FAULTMASK changes.
+    UC_HOOK_ARM_FAULTMASK = 1 << 20,
 } uc_hook_type;
 
 // Hook type for all events of unmapped memory access

@@ -243,6 +243,7 @@ HOOK_INSN_INVALID_CFUNC = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ctypes.c_vo
 HOOK_EDGE_GEN_CFUNC     = ctypes.CFUNCTYPE(None, uc_engine, ctypes.POINTER(uc_tb), ctypes.POINTER(uc_tb), ctypes.c_void_p)
 HOOK_TCG_OPCODE_CFUNC   = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint32, ctypes.c_void_p)
 HOOK_TLB_FILL_CFUNC     = ctypes.CFUNCTYPE(ctypes.c_bool, uc_engine, ctypes.c_uint64, ctypes.c_int, ctypes.POINTER(uc_tlb_entry), ctypes.c_void_p)
+HOOK_ARM_MASK_CHANGE_CFUNC = ctypes.CFUNCTYPE(None, uc_engine, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p)
 
 # mmio callback signatures
 MMIO_READ_CFUNC  = ctypes.CFUNCTYPE(ctypes.c_uint64, uc_engine, ctypes.c_uint64, ctypes.c_uint, ctypes.c_void_p)
@@ -1109,6 +1110,13 @@ class Uc(RegStateManager):
 
             return (__hook_tlb_fill_cb,)
 
+        def __hook_arm_mask_change():
+            @uccallback(self, HOOK_ARM_MASK_CHANGE_CFUNC)
+            def __hook_arm_mask_change_cb(uc: Uc, regid: int, old_value: int, new_value: int, key: int) -> None:
+                callback(uc, regid, old_value, new_value, user_data)
+
+            return (__hook_arm_mask_change_cb,)
+
         handlers: Dict[int, Callable[[], Tuple]] = {
             uc.UC_HOOK_INTR               : __hook_intr,
             uc.UC_HOOK_INSN               : __hook_insn,
@@ -1127,7 +1135,9 @@ class Uc(RegStateManager):
             uc.UC_HOOK_INSN_INVALID       : __hook_invalid_insn,
             uc.UC_HOOK_EDGE_GENERATED     : __hook_edge_gen,
             uc.UC_HOOK_TCG_OPCODE         : __hook_tcg_opcode,
-            uc.UC_HOOK_TLB_FILL           : __hook_tlb_fill
+            uc.UC_HOOK_TLB_FILL           : __hook_tlb_fill,
+            uc.UC_HOOK_ARM_PRIMASK        : __hook_arm_mask_change,
+            uc.UC_HOOK_ARM_FAULTMASK      : __hook_arm_mask_change
         }
 
         # the same callback may be registered for multiple hook types if they

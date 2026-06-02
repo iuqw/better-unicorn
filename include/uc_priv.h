@@ -226,6 +226,8 @@ typedef enum uc_hook_idx {
     UC_HOOK_TCG_OPCODE_IDX,
     UC_HOOK_TLB_FILL_IDX,
     UC_HOOK_BLOCK_ICOUNT_IDX,
+    UC_HOOK_ARM_PRIMASK_IDX,
+    UC_HOOK_ARM_FAULTMASK_IDX,
 
     UC_HOOK_MAX,
 } uc_hook_idx;
