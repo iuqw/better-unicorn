@@ -508,7 +508,7 @@ uc_err reg_write(void *_env, int mode, unsigned int regid, const void *value,
             break;
         case UC_ARM_REG_PRIMASK:
             CHECK_REG_TYPE(uint32_t);
-            helper_v7m_msr(env, 16, *(uint32_t *)value);
+            env->v7m.primask[env->v7m.secure] = *(uint32_t *)value & 1;
             break;
         case UC_ARM_REG_BASEPRI:
             CHECK_REG_TYPE(uint32_t);
@@ -520,7 +520,7 @@ uc_err reg_write(void *_env, int mode, unsigned int regid, const void *value,
             break;
         case UC_ARM_REG_FAULTMASK:
             CHECK_REG_TYPE(uint32_t);
-            helper_v7m_msr(env, 19, *(uint32_t *)value);
+            env->v7m.faultmask[env->v7m.secure] = *(uint32_t *)value & 1;
             break;
         case UC_ARM_REG_APSR_NZCVQ:
             CHECK_REG_TYPE(uint32_t);
