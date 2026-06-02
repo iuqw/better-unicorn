@@ -1292,6 +1292,11 @@ uc_err uc_trigger_safe_hook(uc_engine *uc)
     UC_INIT(uc);
 
     uc->safe_hook_pending = true;
+    if (uc->mmio_callback_depth) {
+        restore_jit_state(uc);
+        return UC_ERR_OK;
+    }
+
     uc_err err = break_translation_loop(uc);
 
     restore_jit_state(uc);

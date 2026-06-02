@@ -396,6 +396,7 @@ struct uc_struct {
     bool quit_request;   // request to quit the current TB, but continue to
                          // emulate - for uc_mem_protect()
     bool safe_hook_pending; // request to dispatch UC_HOOK_SAFE in cpu_exec()
+    unsigned int mmio_callback_depth; // user MMIO callback currently active
     bool emulation_done; // emulation is done by uc_emu_start()
     bool timed_out;      // emulation timed out, that can retrieve via
                          // uc_query(UC_QUERY_TIMEOUT)
