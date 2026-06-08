@@ -8,6 +8,7 @@
 
 #include "qemu/osdep.h"
 #include "unicorn/arm.h"
+#include "exec/uc_hook_state.h"
 #include "qemu/units.h"
 #include "cpu.h"
 #include "internals.h"
@@ -73,11 +74,17 @@ static void uc_arm_mask_changed(CPUARMState *env, uc_hook_idx hook_idx,
 {
     struct uc_struct *uc = env->uc;
     struct hook *hook;
+    uint32_t pc;
+    UcHookState hook_state;
     HOOK_FOREACH_VAR_DECLARE;
 
     if (!uc || old_value == new_value) {
         return;
     }
+
+    uc_hook_state_init(env, &hook_state);
+    uc_hook_state_sync(env, GETPC(), &hook_state);
+    pc = env->regs[15];
 
     for (cur = uc->hook[hook_idx].head;
          cur != NULL && (hook = (struct hook *)cur->data); cur = cur->next) {
@@ -92,6 +99,14 @@ static void uc_arm_mask_changed(CPUARMState *env, uc_hook_idx hook_idx,
             break;
         }
     }
+
+    if (env->regs[15] != pc) {
+        uc->quit_request = true;
+        uc->skip_sync_pc_on_exit = true;
+        cpu_loop_exit(env_cpu(env));
+    }
+
+    uc_hook_state_restore(env, &hook_state);
 }
 
 static void v7m_write_primask(CPUARMState *env, uint32_t bank,

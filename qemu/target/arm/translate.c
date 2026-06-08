@@ -11672,15 +11672,18 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         switch (dc->base.is_jmp) {
         case DISAS_SWI:
             gen_ss_advance(dc);
+            gen_set_pc_im(dc, dc->base.pc_next);
             gen_exception(tcg_ctx, EXCP_SWI, syn_aa32_svc(dc->svc_imm, dc->thumb),
                           default_exception_el(dc));
             break;
         case DISAS_HVC:
             gen_ss_advance(dc);
+            gen_set_pc_im(dc, dc->base.pc_next);
             gen_exception(tcg_ctx, EXCP_HVC, syn_aa32_hvc(dc->svc_imm), 2);
             break;
         case DISAS_SMC:
             gen_ss_advance(dc);
+            gen_set_pc_im(dc, dc->base.pc_next);
             gen_exception(tcg_ctx, EXCP_SMC, syn_aa32_smc(), 3);
             break;
         case DISAS_NEXT:
@@ -11744,13 +11747,16 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
             gen_helper_yield(tcg_ctx, tcg_ctx->cpu_env);
             break;
         case DISAS_SWI:
+            gen_set_pc_im(dc, dc->base.pc_next);
             gen_exception(tcg_ctx, EXCP_SWI, syn_aa32_svc(dc->svc_imm, dc->thumb),
                           default_exception_el(dc));
             break;
         case DISAS_HVC:
+            gen_set_pc_im(dc, dc->base.pc_next);
             gen_exception(tcg_ctx, EXCP_HVC, syn_aa32_hvc(dc->svc_imm), 2);
             break;
         case DISAS_SMC:
+            gen_set_pc_im(dc, dc->base.pc_next);
             gen_exception(tcg_ctx, EXCP_SMC, syn_aa32_smc(), 3);
             break;
         }

@@ -1297,6 +1297,14 @@ uc_err uc_trigger_safe_hook(uc_engine *uc)
         return UC_ERR_OK;
     }
 
+    /*
+     * UC_HOOK_SAFE is delivered after breaking out of generated code. Make
+     * sure an old in-callback PC write does not suppress the GETPC-based
+     * restore used by the TB-exit path; otherwise the safe hook can observe
+     * and stack a stale PC.
+     */
+    uc->skip_sync_pc_on_exit = false;
+
     uc_err err = break_translation_loop(uc);
 
     restore_jit_state(uc);

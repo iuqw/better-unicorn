@@ -404,6 +404,11 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
 #endif
         // Unicorn: call registered interrupt callbacks
         catched = false;
+#if defined(TARGET_ARM)
+        CPUArchState *env = cpu->env_ptr;
+        uint32_t hook_pc = env->regs[15];
+        uint32_t hook_thumb = env->thumb;
+#endif
         HOOK_FOREACH_VAR_DECLARE;
         HOOK_FOREACH(uc, hook, UC_HOOK_INTR) {
             if (hook->to_delete) {
@@ -412,6 +417,26 @@ static inline bool cpu_handle_exception(CPUState *cpu, int *ret)
             JIT_CALLBACK_GUARD(((uc_cb_hookintr_t)hook->callback)(uc, cpu->exception_index, hook->user_data));
             catched = true;
         }
+
+#if defined(TARGET_ARM)
+        /*
+         * Interrupt hooks run after generated code has already exited via
+         * cpu_loop_exit(). If a hook writes PC, uc_reg_write() sets
+         * skip_sync_pc_on_exit for in-TB callbacks; leaving it set here makes
+         * later fault/MMIO hooks skip their uc_hook_state_sync() and
+         * report or stack stale PCs. Preserve hook-written control flow with
+         * quit_request, then clear the stale in-TB sync suppression.
+         */
+        if (catched &&
+            (env->regs[15] != hook_pc || env->thumb != hook_thumb ||
+             cpu->exception_index == EXCP_EXCEPTION_EXIT)) {
+            uc->quit_request = true;
+        }
+        if (catched) {
+            uc->skip_sync_pc_on_exit = false;
+        }
+#endif
+
         // Unicorn: If un-catched interrupt, stop executions.
         if (!catched) {
             // printf("AAAAAAAAAAAA\n"); qq
@@ -512,6 +537,7 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     int32_t insns_left;
 
     // trace_exec_tb(tb, tb->pc);
+    uc_pc_log_write(cpu->uc, tb->pc);
     ret = cpu_tb_exec(cpu, tb);
     cpu->uc->last_tb = tb; // Trace the last tb we executed.
     tb = (TranslationBlock *)(ret & ~TB_EXIT_MASK);
@@ -553,6 +579,11 @@ static inline bool cpu_handle_safe_hook(CPUState *cpu, int *ret)
 {
     struct uc_struct *uc = cpu->uc;
     struct hook *hook;
+#if defined(TARGET_ARM)
+    CPUArchState *env = cpu->env_ptr;
+    uint32_t hook_pc;
+    uint32_t hook_thumb;
+#endif
     HOOK_FOREACH_VAR_DECLARE;
 
     if (!uc->safe_hook_pending) {
@@ -560,6 +591,10 @@ static inline bool cpu_handle_safe_hook(CPUState *cpu, int *ret)
     }
 
     uc->safe_hook_pending = false;
+#if defined(TARGET_ARM)
+    hook_pc = env->regs[15];
+    hook_thumb = env->thumb;
+#endif
 
     HOOK_FOREACH(uc, hook, UC_HOOK_SAFE) {
         if (hook->to_delete) {
@@ -573,6 +608,13 @@ static inline bool cpu_handle_safe_hook(CPUState *cpu, int *ret)
             break;
         }
     }
+
+#if defined(TARGET_ARM)
+    if (env->regs[15] != hook_pc || env->thumb != hook_thumb) {
+        uc->quit_request = true;
+    }
+    uc->skip_sync_pc_on_exit = false;
+#endif
 
     if (uc->stop_request) {
         *ret = EXCP_HLT;
