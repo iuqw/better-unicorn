@@ -537,7 +537,6 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     int32_t insns_left;
 
     // trace_exec_tb(tb, tb->pc);
-    uc_pc_log_write(cpu->uc, tb->pc);
     ret = cpu_tb_exec(cpu, tb);
     cpu->uc->last_tb = tb; // Trace the last tb we executed.
     tb = (TranslationBlock *)(ret & ~TB_EXIT_MASK);
