@@ -6337,7 +6337,7 @@ static void m68k_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
         gen_uc_tracecode(tcg_ctx, 2, UC_HOOK_CODE_IDX, uc, dc->pc);
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     insn = read_im16(env, dc);

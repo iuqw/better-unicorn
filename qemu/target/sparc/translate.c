@@ -5968,7 +5968,7 @@ static void sparc_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 
         gen_uc_tracecode(tcg_ctx, 4, UC_HOOK_CODE_IDX, uc, dc->pc);
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     insn = translator_ldl(tcg_ctx, env, dc->pc);

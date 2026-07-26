@@ -9246,7 +9246,7 @@ static void tricore_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
             gen_uc_tracecode(tcg_ctx, insn_size, UC_HOOK_CODE_IDX, ctx->uc,
                              ctx->base.pc_next);
             // the callback might want to stop emulation immediately
-            check_exit_request(tcg_ctx);
+            check_exit_request_safe(tcg_ctx);
         }
 
         if (is_16bit) {

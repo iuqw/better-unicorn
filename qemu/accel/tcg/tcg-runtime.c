@@ -165,10 +165,17 @@ void HELPER(exit_atomic)(CPUArchState *env)
     cpu_loop_exit_atomic(env_cpu(env), GETPC());
 }
 
-void HELPER(check_exit_request)(void *p, uint32_t in_delay_slot) {
+void HELPER(check_exit_request)(void *p, uint32_t in_delay_slot,
+                                uint32_t safe_point) {
     uc_engine *uc = p;
 
     if (cpu_loop_exit_requested(uc->cpu) && !in_delay_slot) {
+	// appleflyer: fix race
+        if (uc->safe_hook_pending && !safe_point && !uc->stop_request &&
+            !uc->quit_request && uc->invalid_error == UC_ERR_OK) {
+            return;
+        }
+
         // There are stil something we have to before exiting to be compatible with previous behaviors
 
         // from cpu_tb_exec

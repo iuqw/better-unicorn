@@ -30962,7 +30962,7 @@ static void mips_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
         prev_op = tcg_last_op(tcg_ctx);
         hook_insn = true;
         gen_uc_tracecode(tcg_ctx, 4, UC_HOOK_CODE_IDX, uc, ctx->base.pc_next);
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
     
     if (ctx->insn_flags & ISA_NANOMIPS32) {

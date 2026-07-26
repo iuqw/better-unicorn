@@ -40,7 +40,9 @@ static inline void gen_tb_start(TCGContext *tcg_ctx, TranslationBlock *tb)
     if (tcg_ctx->delay_slot_flag != NULL) {
         tcg_gen_mov_i32(tcg_ctx, tmp, tcg_ctx->delay_slot_flag);
     }
-    gen_helper_check_exit_request(tcg_ctx, puc, tmp);
+    TCGv_i32 safe_point = tcg_const_i32(tcg_ctx, 1);
+    gen_helper_check_exit_request(tcg_ctx, puc, tmp, safe_point);
+    tcg_temp_free_i32(tcg_ctx, safe_point);
     tcg_temp_free_i32(tcg_ctx, tmp);
     tcg_temp_free_ptr(tcg_ctx, puc);
 }

@@ -20,6 +20,13 @@ typedef struct _MMIO_MAP_WRITE_PC_SYNC_RESULT {
     uint32_t pc_val;
 } MMIO_MAP_WRITE_PC_SYNC_RESULT;
 
+typedef struct _SAFE_HOOK_MEMORY_RESULT {
+    unsigned int writes;
+    unsigned int safe_calls;
+    uint32_t safe_pc;
+    uc_err trigger_err;
+} SAFE_HOOK_MEMORY_RESULT;
+
 static void test_arm_nop(void)
 {
     uc_engine *uc;
@@ -1212,6 +1219,67 @@ static void test_arm_mmio_map_pc_sync(void)
     OK(uc_close(uc));
 };
 
+static bool test_arm_safe_hook_memory_cb(uc_engine *uc, int type,
+                                         uint64_t address, int size,
+                                         int64_t value, void *user_data)
+{
+    SAFE_HOOK_MEMORY_RESULT *result = user_data;
+
+    if (type == UC_MEM_WRITE && ++result->writes == 1) {
+        result->trigger_err = uc_trigger_safe_hook(uc);
+    }
+
+    return false;
+}
+
+static void test_arm_safe_hook_cb(uc_engine *uc, void *user_data)
+{
+    SAFE_HOOK_MEMORY_RESULT *result = user_data;
+
+    result->safe_calls++;
+    OK(uc_reg_read(uc, UC_ARM_REG_PC, &result->safe_pc));
+}
+
+static void test_arm_safe_hook_does_not_retry_store(void)
+{
+    uc_engine *uc;
+    uc_hook mem_hook;
+    uc_hook safe_hook;
+    /*
+     * str  r0, [r1]
+     * adds r2, #1
+     * b    .
+     */
+    const char code[] = "\x08\x60\x01\x32\xfe\xe7";
+    const uint32_t data_address = 0x8000;
+    uint32_t r0 = 0x12345678;
+    uint32_t r1 = data_address;
+    SAFE_HOOK_MEMORY_RESULT result = {
+        .safe_pc = UINT32_MAX,
+        .trigger_err = UC_ERR_OK,
+    };
+
+    uc_common_setup(&uc, UC_ARCH_ARM, UC_MODE_THUMB | UC_MODE_MCLASS, code,
+                    sizeof(code) - 1, UC_CPU_ARM_CORTEX_M3);
+    OK(uc_mem_map(uc, data_address, 0x4000, UC_PROT_ALL));
+    OK(uc_reg_write(uc, UC_ARM_REG_R0, &r0));
+    OK(uc_reg_write(uc, UC_ARM_REG_R1, &r1));
+    OK(uc_hook_add(uc, &mem_hook, UC_HOOK_MEM_WRITE,
+                   test_arm_safe_hook_memory_cb, &result, data_address,
+                   data_address + sizeof(r0) - 1));
+    OK(uc_hook_add(uc, &safe_hook, UC_HOOK_SAFE, test_arm_safe_hook_cb,
+                   &result, 1, 0));
+
+    OK(uc_emu_start(uc, code_start | 1, UINT32_MAX, 0, 4));
+
+    OK(result.trigger_err);
+    TEST_CHECK(result.writes == 1);
+    TEST_CHECK(result.safe_calls == 1);
+    TEST_CHECK(result.safe_pc == code_start + 2);
+
+    OK(uc_close(uc));
+}
+
 static bool test_arm_hook_condexec_corruption_cb(uc_engine *uc, int type,
                                                  uint64_t address, int size,
                                                  int64_t value, void *user_data)
@@ -1484,6 +1552,8 @@ TEST_LIST = {{"test_arm_nop", test_arm_nop},
              {"test_arm_svc_hvc_syndrome", test_arm_svc_hvc_syndrome},
              {"test_arm_hook_insn_wfi", test_arm_hook_insn_wfi},
              {"test_arm_mmio_map_pc_sync", test_arm_mmio_map_pc_sync},
+             {"test_arm_safe_hook_does_not_retry_store",
+              test_arm_safe_hook_does_not_retry_store},
              {"test_arm_hook_condexec_corruption", test_arm_hook_condexec_corruption},
              {"test_arm_tlb_fill_it_state", test_arm_tlb_fill_it_state},
              {"test_arm_wfi_hook_it_state", test_arm_wfi_hook_it_state},

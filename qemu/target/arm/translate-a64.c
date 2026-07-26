@@ -14522,7 +14522,7 @@ static void disas_a64_insn(CPUARMState *env, DisasContext *s)
 
         gen_uc_tracecode(tcg_ctx, 4, UC_HOOK_CODE_IDX, env->uc, s->pc_curr);
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     s->fp_access_checked = false;

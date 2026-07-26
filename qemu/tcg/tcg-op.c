@@ -2850,7 +2850,7 @@ static void gen_ldst_i64(TCGContext *tcg_ctx, TCGOpcode opc, TCGv_i64 val, TCGv 
 // Unicorn engine
 // check if the last memory access was invalid
 // if so, we jump to the block epilogue to quit immediately.
-void check_exit_request(TCGContext *tcg_ctx)
+static void check_exit_request_internal(TCGContext *tcg_ctx, bool safe_point)
 {
     // Unicorn:
     //   For ARM IT block, we couldn't exit in the middle of the
@@ -2867,9 +2867,21 @@ void check_exit_request(TCGContext *tcg_ctx)
     if (tcg_ctx->delay_slot_flag != NULL) {
         tcg_gen_mov_i32(tcg_ctx, tmp, tcg_ctx->delay_slot_flag);
     }
-    gen_helper_check_exit_request(tcg_ctx, puc, tmp);
+    TCGv_i32 safe = tcg_const_i32(tcg_ctx, safe_point);
+    gen_helper_check_exit_request(tcg_ctx, puc, tmp, safe);
+    tcg_temp_free_i32(tcg_ctx, safe);
     tcg_temp_free_i32(tcg_ctx, tmp);
     tcg_temp_free_ptr(tcg_ctx, puc);
+}
+
+void check_exit_request(TCGContext *tcg_ctx)
+{
+    check_exit_request_internal(tcg_ctx, false);
+}
+
+void check_exit_request_safe(TCGContext *tcg_ctx)
+{
+    check_exit_request_internal(tcg_ctx, true);
 }
 
 static void tcg_gen_req_mo(TCGContext *tcg_ctx, TCGBar type)

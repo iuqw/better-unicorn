@@ -6695,7 +6695,7 @@ static DisasJumpType translate_one(CPUS390XState *env, DisasContext *s)
         update_cc_op(s);
         gen_uc_tracecode(tcg_ctx, s->ilen, UC_HOOK_CODE_IDX, s->uc, s->base.pc_next);
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     /* Not found means unimplemented/illegal opcode.  */

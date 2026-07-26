@@ -10951,7 +10951,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
         
         gen_uc_tracecode(tcg_ctx, 4, UC_HOOK_CODE_IDX, s->uc, s->pc_curr);
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     if (cond == 0xf) {
@@ -11602,7 +11602,7 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
             gen_uc_tracecode(tcg_ctx, insn_size, UC_HOOK_CODE_IDX, uc, dc->base.pc_next - insn_size);
         }
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     tcg_ctx->pc_start = dc->base.pc_next - insn_size;

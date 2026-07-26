@@ -7640,7 +7640,7 @@ static void ppc_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 
         gen_uc_tracecode(tcg_ctx, 4, UC_HOOK_CODE_IDX, uc, ctx->base.pc_next);
         // the callback might want to stop emulation immediately
-        check_exit_request(tcg_ctx);
+        check_exit_request_safe(tcg_ctx);
     }
 
     ctx->opcode = translator_ldl_swap(tcg_ctx, env, ctx->base.pc_next,
