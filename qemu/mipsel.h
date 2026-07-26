@@ -589,6 +589,7 @@
 #define tcg_gen_goto_tb tcg_gen_goto_tb_mipsel
 #define tcg_gen_lookup_and_goto_ptr tcg_gen_lookup_and_goto_ptr_mipsel
 #define check_exit_request check_exit_request_mipsel
+#define check_exit_request_safe check_exit_request_safe_mipsel
 #define tcg_gen_qemu_ld_i32 tcg_gen_qemu_ld_i32_mipsel
 #define tcg_gen_qemu_st_i32 tcg_gen_qemu_st_i32_mipsel
 #define tcg_gen_qemu_ld_i64 tcg_gen_qemu_ld_i64_mipsel
